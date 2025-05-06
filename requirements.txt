@@ -12,3 +12,4 @@ langchain-text-splitters
 tantivy
 pylance
 langfuse
+uuid

@@ -1,10 +1,17 @@
+import uuid
+
 import lancedb
 import streamlit as st
 from dotenv import load_dotenv
 from lancedb.rerankers import RRFReranker
 from langfuse import Langfuse
-from langfuse.decorators import observe
+from langfuse.decorators import langfuse_context, observe
 from langfuse.openai import OpenAI
+
+# Generate a UUIDv4
+if "session_uuid" not in st.session_state:
+    st.session_state.session_uuid = str(uuid.uuid4())
+session_uuid = st.session_state.session_uuid
 
 # Load environment variables
 load_dotenv()
@@ -15,8 +22,6 @@ client = OpenAI()
 reranker = RRFReranker()
 
 langfuse = Langfuse()
-
-# Initialize LanceDB connection
 
 
 @st.cache_resource
@@ -111,6 +116,9 @@ def get_chat_response(messages, context: str) -> str:
 @observe()
 def handle_prompt(prompt: str, table):
     """Handles the user prompt, gets context, generates response, and updates chat."""
+
+    langfuse_context.update_current_trace(session_id=session_uuid)
+
     # Display user message
     with st.chat_message("user"):
         st.markdown(prompt)
