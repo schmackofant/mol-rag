@@ -78,7 +78,7 @@ def get_context(query: str, table, num_results: int = 8) -> str:
     return ["\n\n".join(contexts), results]
 
 
-@observe()
+@observe
 def get_chat_response(messages, context: str) -> str:
     """Get streaming response from OpenAI API.
 
@@ -89,10 +89,8 @@ def get_chat_response(messages, context: str) -> str:
     Returns:
         str: Model's response
     """
-    system_prompt = langfuse.get_prompt("Simple Q&A prompt")
-    compiled_prompt = system_prompt.compile(context=context)
-
-    # print(f"System prompt: {system_prompt}")
+    langfuse_prompt = langfuse.get_prompt("Simple Q&A prompt")
+    compiled_prompt = langfuse_prompt.compile(context=context)
 
     messages_with_context = [{"role": "system", "content": compiled_prompt}, *messages]
 
@@ -102,6 +100,7 @@ def get_chat_response(messages, context: str) -> str:
         messages=messages_with_context,
         temperature=0.7,
         stream=True,
+        langfuse_prompt=langfuse_prompt,  # capture used prompt version in trace
     )
 
     # Use Streamlit's built-in streaming capability
