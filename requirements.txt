@@ -11,3 +11,4 @@ pandas
 langchain-text-splitters
 tantivy
 pylance
+langfuse

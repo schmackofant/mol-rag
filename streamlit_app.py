@@ -2,7 +2,9 @@ import lancedb
 import streamlit as st
 from dotenv import load_dotenv
 from lancedb.rerankers import RRFReranker
-from openai import OpenAI
+from langfuse import Langfuse
+from langfuse.decorators import observe
+from langfuse.openai import OpenAI
 
 # Load environment variables
 load_dotenv()
@@ -12,8 +14,11 @@ client = OpenAI()
 
 reranker = RRFReranker()
 
+langfuse = Langfuse()
 
 # Initialize LanceDB connection
+
+
 @st.cache_resource
 def init_db():
     """Initialize database connection.
@@ -25,6 +30,7 @@ def init_db():
     return db.open_table("molrag")
 
 
+@observe()
 def get_context(query: str, table, num_results: int = 8) -> str:
     """Search the database for relevant context.
 
@@ -72,6 +78,7 @@ def get_context(query: str, table, num_results: int = 8) -> str:
     return ["\n\n".join(contexts), results]
 
 
+@observe()
 def get_chat_response(messages, context: str) -> str:
     """Get streaming response from OpenAI API.
 
@@ -82,17 +89,12 @@ def get_chat_response(messages, context: str) -> str:
     Returns:
         str: Model's response
     """
-    system_prompt = f"""You are a helpful assistant (employed by Molecule) specialized in Decentralized Science
-    that answers questions based on the provided context. Use only the information from the context
-    to answer questions. If you're unsure or the context doesn't contain the relevant information, say so.
-
-    Context:
-    {context}
-    """
+    system_prompt = langfuse.get_prompt("Simple Q&A prompt")
+    compiled_prompt = system_prompt.compile(context=context)
 
     # print(f"System prompt: {system_prompt}")
 
-    messages_with_context = [{"role": "system", "content": system_prompt}, *messages]
+    messages_with_context = [{"role": "system", "content": compiled_prompt}, *messages]
 
     # Create the streaming response
     stream = client.chat.completions.create(
@@ -107,23 +109,9 @@ def get_chat_response(messages, context: str) -> str:
     return response
 
 
-# Initialize Streamlit app
-st.title("📚 Molecule Q&A")
-
-# Initialize session state for chat history
-if "messages" not in st.session_state:
-    st.session_state.messages = []
-
-# Initialize database connection
-table = init_db()
-
-# Display chat messages
-for message in st.session_state.messages:
-    with st.chat_message(message["role"]):
-        st.markdown(message["content"])
-
-# Chat input
-if prompt := st.chat_input("Ask a question about DeSci or Molecule"):
+@observe()
+def handle_prompt(prompt: str, table):
+    """Handles the user prompt, gets context, generates response, and updates chat."""
     # Display user message
     with st.chat_message("user"):
         st.markdown(prompt)
@@ -132,7 +120,7 @@ if prompt := st.chat_input("Ask a question about DeSci or Molecule"):
     st.session_state.messages.append({"role": "user", "content": prompt})
 
     # Get relevant context
-    with st.status("Searching documentation...", expanded=False) as status:
+    with st.status("Searching documentation...", expanded=False):
         context_data = get_context(prompt, table)
         context = context_data[0]
         results = context_data[1]
@@ -191,3 +179,25 @@ if prompt := st.chat_input("Ask a question about DeSci or Molecule"):
 
     # Add assistant response to chat history
     st.session_state.messages.append({"role": "assistant", "content": response})
+
+    return response
+
+
+# Initialize Streamlit app
+st.title("📚 Molecule Q&A")
+
+# Initialize session state for chat history
+if "messages" not in st.session_state:
+    st.session_state.messages = []
+
+# Initialize database connection
+table = init_db()
+
+# Display chat messages
+for message in st.session_state.messages:
+    with st.chat_message(message["role"]):
+        st.markdown(message["content"])
+
+# Chat input
+if prompt := st.chat_input("Ask a question about DeSci or Molecule"):
+    handle_prompt(prompt, table)
