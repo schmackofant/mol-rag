@@ -117,7 +117,7 @@ def get_chat_response(messages, context: str) -> str:
 def handle_prompt(prompt: str, table):
     """Handles the user prompt, gets context, generates response, and updates chat."""
 
-    langfuse_context.update_current_trace(session_id=session_uuid)
+    langfuse_context.update_current_trace(session_id=session_uuid, input=prompt)
 
     # Display user message
     with st.chat_message("user"):
